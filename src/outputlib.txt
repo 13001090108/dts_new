@@ -1,0 +1,6 @@
+输入输出子程序,函数库为io.h、conio.h、stat.h、dos.h、stdio.h、signal.h 
+kbhit fget getch putch get put getchr ungetch cgets scanf vscanf cscanf 
+sscanf vsscanf rename ioctl write _write getftime setftime getc getw ungetc fgetc  
+fgets fread fscanf vfscanf fprf vfprf fseek ftell rewind gets 
+
+

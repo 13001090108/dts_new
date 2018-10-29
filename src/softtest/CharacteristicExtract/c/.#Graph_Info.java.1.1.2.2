@@ -1,0 +1,239 @@
+package softtest.CharacteristicExtract.c;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import softtest.SDataBase.c.DataBaseAccess;
+import softtest.SDataBase.c.FileInformatica;
+import softtest.ast.c.ASTTranslationUnit;
+import softtest.ast.c.CCharStream;
+import softtest.ast.c.CParser;
+import softtest.callgraph.c.CGraph;
+import softtest.callgraph.c.CVexNode;
+import softtest.callgraph.c.DumpCGraphVisitor;
+import softtest.cfg.c.DumpGraphVisitor;
+import softtest.cfg.c.Graph;
+import softtest.database.c.DBAccess;
+import softtest.interpro.c.InterContext;
+import softtest.symboltable.c.AbstractScope;
+import softtest.symboltable.c.OccurrenceAndExpressionTypeFinder;
+import softtest.symboltable.c.ScopeAndDeclarationFinder;
+
+public class Graph_Info {
+	private  List<String> filePathList;
+	
+	/** 返回给定路径的文件的特征信息*/
+	public  static String  getFunction(String filePath) throws Exception{
+		String file_metric = new String();
+		
+		Metric m = new Metric();	
+		file_metric = m.getMetric(filePath);
+		//得到改文件内函数调用关系图的特征信息
+		//System.out.println("文件特征信息为：");
+		//System.out.println(file_metric);
+		return file_metric;
+	}
+	
+	/** 返回给定路径的文件中所有函数的特征信息*/
+	public static List<String> getAllFuncInfo(String filePath) throws Exception{
+		List<CVexNode> graph_list = new ArrayList<CVexNode>();
+		List<String> func_metric = new ArrayList<String>();
+		graph_list = getCVexNode(filePath);
+	
+		if(graph_list.size() == 0){
+			return null;
+		}else{
+			Metric m = new Metric();
+			//System.out.println(graph_list);
+			func_metric = m.getgetFuncMetric(graph_list,filePath);	
+		}
+		
+		
+		//System.out.println("文件内各个函数的特征信息为：");
+		//for(String s : func_metric){
+			//System.out.println(s);
+		//}
+		return func_metric;
+	}
+	
+public  static void main(String[] args) throws Exception{
+		
+		String filePath = "C:/Users/Miss_Lizi/Desktop/for testing/gsl-2.3";
+		File srcFile = new File(filePath);
+		List<String> file = new ArrayList<String>();
+		file = collect(srcFile,file);
+		//System.out.println(file);
+		DataBaseAccess dbAccess = DataBaseAccess.getInstance();
+		dbAccess.openDataBase("C:/Users/Miss_Lizi/Desktop/success.mdb");
+		for(String file_c : file){
+			System.out.println(file_c);
+			dbAccess.insertFileInfo(getFunction(file_c));
+			dbAccess.insertFuncInfo(getAllFuncInfo(file_c));
+		}
+	
+		//getAllFuncInfo(filePath);
+		//getFunction(filePath);
+		//dbAccess.insertFileInfo(getFunction("C:/Users/Miss_Lizi/Desktop/for testing/gsl-2.3/utils/memcpy.c"));
+		//dbAccess.insertFuncInfo(getAllFuncInfo("C:/Users/Miss_Lizi/Desktop/for testing/gsl-2.3/utils/memcpy.c"));
+		//System.out.println(getAllFuncInfo("C:/Users/Miss_Lizi/Desktop/for testing/gsl-2.3/utils/memcpy.c"));
+		//FileInformatica file = new FileInformatica("example",21,45,13);
+		//DataBaseAccess dbAccess = DataBaseAccess.getInstance();
+		//dbAccess.openDataBase("C:/Users/Miss_Lizi/Desktop/success.mdb");
+		//dbAccess.insertFileInfo(getFunction(filePath));
+		//dbAccess.insertFuncInfo(getAllFuncInfo(filePath));
+		//System.out.println(dbAccess.readFuncInfo());
+		dbAccess.closeDataBase();
+	}
+	
+
+	/**返回文件内所有函数的节点列表*/
+	public static List<CVexNode> getCVexNode(String filePath) throws Exception{
+		//System.out.println("生成抽象语法树...");
+		CParser parser = CParser.getParser(new CCharStream(new FileInputStream(filePath)));
+		ASTTranslationUnit root=parser.TranslationUnit();
+				//产生符号表
+		//System.out.println("生成符号表...");
+		ScopeAndDeclarationFinder sc=new ScopeAndDeclarationFinder();
+		root.jjtAccept(sc, null);
+		OccurrenceAndExpressionTypeFinder o=new OccurrenceAndExpressionTypeFinder();
+		root.jjtAccept(o, null);
+		
+		CGraph g = new CGraph();
+		((AbstractScope)root.getScope()).resolveCallRelation(g);
+		
+		List<CVexNode> list=g.getTopologicalOrderList();
+		Collections.reverse(list);
+		/*System.out.println("调用关系拓扑逆序：");
+		for(CVexNode n:list){
+			System.out.print(n.getName()+"  ");
+		}
+		System.out.println();*/
+		
+		
+		String name ="wangy/wangy";
+		g.accept(new DumpCGraphVisitor(), name + ".dot");
+		//System.out.println("调用图图输出到了文件" + name + ".dot");
+		try {
+			java.lang.Runtime.getRuntime().exec("dot -Tjpg -o " + name + ".jpg " + name + ".dot").waitFor();
+		} catch (IOException e1) {
+			System.out.println(e1);
+		} catch (InterruptedException e2) {
+			System.out.println(e2);
+		}
+		//System.out.println("调用图打印到了文件" + name + ".jpg");
+		
+		//System.out.println();
+		
+		//added by wangy
+		//测试函数调用关系中是否成功加入controlflowgraph
+		
+		//System.out.println();
+		//return g;
+		
+		return list;
+	}
+	
+	/**返回函数间调用关系图*/
+	public static CGraph getCGraph(String filePath) throws Exception{
+		//System.out.println("生成抽象语法树...");
+		CParser parser = CParser.getParser(new CCharStream(new FileInputStream(filePath)));
+		ASTTranslationUnit root=parser.TranslationUnit();
+		
+		//产生符号表
+		//System.out.println("生成符号表...");
+		ScopeAndDeclarationFinder sc=new ScopeAndDeclarationFinder();
+		root.jjtAccept(sc, null);
+		OccurrenceAndExpressionTypeFinder o=new OccurrenceAndExpressionTypeFinder();
+		root.jjtAccept(o, null);
+		
+		CGraph g = new CGraph(filePath);
+		((AbstractScope)root.getScope()).resolveCallRelation(g);
+		
+		List<CVexNode> list=g.getTopologicalOrderList();
+		Collections.reverse(list);
+		/*System.out.println("调用关系拓扑逆序：");
+		for(CVexNode n:list){
+			System.out.print(n.getName()+"  ");
+		}
+		System.out.println();*/
+		
+		
+		String name ="wangy/wangy";
+		g.accept(new DumpCGraphVisitor(), name + ".dot");
+		//System.out.println("调用图图输出到了文件" + name + ".dot");
+		try {
+			java.lang.Runtime.getRuntime().exec("dot -Tjpg -o " + name + ".jpg " + name + ".dot").waitFor();
+		} catch (IOException e1) {
+			System.out.println(e1);
+		} catch (InterruptedException e2) {
+			System.out.println(e2);
+		}
+		//System.out.println("调用图打印到了文件" + name + ".jpg");
+		
+		//System.out.println();
+		return g;
+	}
+
+	/**得到函数的控制流图信息*/
+	public static String getFuncInfo(Graph graph, String filePath){
+		List<Long> list = new ArrayList<Long>();
+		String name = filePath + "#" + graph.getname();
+		Long vex_num = (long)graph.getVexNum();
+		Long edge_num = graph.getedgecount();
+		//System.out.println("函数的控制流图的节点数为：" + vex_num);
+		//System.out.println("函数的控制流图的边数为：" + edge_num);
+		list.add(vex_num);
+		list.add(edge_num);
+		
+		return toString(list,name);
+	}
+	
+	/**得到文件中函数的调用关系图信息*/
+	public static String getFileInfo(CGraph cg){
+		if(cg == null){
+			return null;
+		}
+		List<Long> list = new ArrayList<Long>();
+		String name = cg.getname();
+		Long vex_num = cg.getnodecount();
+		Long edge_num = cg.getedgecount();
+		//System.out.println("函数的控制流图的节点数为：" + vex_num);
+		//System.out.println("函数的控制流图的边数为：" + edge_num);
+		long gMcCabe = edge_num - vex_num + 2;
+		list.add(vex_num);
+		list.add(edge_num);
+		list.add(gMcCabe);
+		
+		return toString(list,name);
+	}
+	
+	/**转换为字符串的形式*/
+	public static String toString( List<Long> list, String name){
+		String res = name;
+		for(int i = 0 ; i < list.size(); i++){
+			res += "#" + list.get(i);
+		}
+		return res;
+	}
+
+	/**
+	 * 收集当前测试工程的所有源文件（.C源文件），并将搜索到的.C文件加入到待分析列表中
+	 */
+	private  static List<String> collect(File srcFile,List<String> res) {
+		//List<String> res = new ArrayList<String>();
+		if (srcFile.isFile() && srcFile.getName().matches(InterContext.SRCFILE_POSTFIX)) {
+			res.add(srcFile.getPath());
+		} else if (srcFile.isDirectory()) {
+			File[] fs = srcFile.listFiles();
+			for (int i = 0; i < fs.length; i++) {
+				collect(fs[i],res);
+			}
+		}
+		//System.out.println(res);
+		return res;
+	}
+}
